@@ -35,6 +35,8 @@ public:
 
 	cv::Mat PerspectiveTransform(cv::Mat input_image, cv::Mat* transform_mat, cv::Mat* transform_mat_inv);
 
+	int HistogramCalc(cv::Mat input_image);
+
 	void FindBaseLanes(cv::Mat input_image, int* lane_left, int* lane_right);
 
 	cv::Mat DetectLine(cv::Mat input_image, int num_windows, bool display);

@@ -22,8 +22,8 @@ cv::Mat read_image()
 	VideoResultDisplay video_display;
 
 	// Location of the input trial video and trial image folders
-	string path_video = "D:/CODE/PRIVATE/20201111_lane_detection_semantic_segmentation/video_input/";
-	string path_image = "D:/CODE/PRIVATE/20201111_lane_detection_semantic_segmentation/images/test_images/";
+	string path_video = "D:/CODE/PRIVATE/LaneDetection/video_input/";
+	string path_image = "D:/CODE/PRIVATE/LaneDetection/images/test_images/";
 	
 	// Specific file names of video & image
 	string video_name = "project_video.mp4";
@@ -100,9 +100,9 @@ int main()
 	int lane_base_left = 1;
 	int lane_base_right = 1;
 	//lane_detector.FindBaseLanes(bird_eye, &lane_base_left, &lane_base_right);
-	std::cout << "lane left: " << lane_base_left << endl;
-	std::cout << "right lane: " << lane_base_right << endl;
-	//bird_eye = lane_detector.DetectLine(bird_eye, 10, true);
+	//std::cout << "lane left: " << lane_base_left << endl;
+	//std::cout << "right lane: " << lane_base_right << endl;
+	bird_eye = lane_detector.DetectLine(bird_eye, 10, true);
 	//cv::imshow("sliding windows", bird_eye);
 
 	cv::waitKey(0);

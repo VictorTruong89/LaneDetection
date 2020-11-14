@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.17)
 
 project(LaneDetection)
 
-set( PROJECT_SOURCE_DIR "D:/CODE/PRIVATE/20201111_lane_detection_semantic_segmentation")
+set( PROJECT_SOURCE_DIR "D:/CODE/PRIVATE/LaneDetection")
 
 # Compile OpenCV library
 find_package( OpenCV REQUIRED HINTS "D:/Libraries/opencv/build" )
