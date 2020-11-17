@@ -37,9 +37,13 @@ public:
 
 	int HistogramCalc(cv::Mat input_image);
 
-	void FindBaseLanes(cv::Mat input_image, int* lane_left, int* lane_right);
+	void FindBaseLanes(cv::Mat input_image, int* lane_base);
 
-	cv::Mat DetectLine(cv::Mat input_image, int num_windows, bool display);
+	void Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, std::vector<std::vector<cv::Point>>* good_lane, int num_windows, bool display);
+
+	void Lane_SemanticSegmentation::polyfit(const std::vector<double>& xv, const std::vector<double>& yv, std::vector<double>& coeff, int order);
+
+	cv::Mat Lane_SemanticSegmentation::getAverageLine(cv::Mat input_image, int num_windows, bool display);
 
 	//cv::Mat SlidingWindow(cv::Mat input_image);
 

@@ -27,7 +27,7 @@ cv::Mat read_image()
 	
 	// Specific file names of video & image
 	string video_name = "project_video.mp4";
-	string image_name = "test6.jpg";
+	string image_name = "test1.jpg";
 	path_video.append(video_name);
 	path_image.append(image_name);
 
@@ -87,8 +87,6 @@ int main()
 
 	// Find lanes
 	cv::imshow("original", input_image);
-	cv::imshow("denoise", deNoise);
-	cv::imshow("thresholded", thresholded);
 	cv::imshow("masked", masked);
 
 	// Perspective transform
@@ -97,13 +95,9 @@ int main()
 	cv::imshow("bird_eye", bird_eye);
 	
 	// Show sliding windows
-	int lane_base_left = 1;
-	int lane_base_right = 1;
-	//lane_detector.FindBaseLanes(bird_eye, &lane_base_left, &lane_base_right);
-	//std::cout << "lane left: " << lane_base_left << endl;
-	//std::cout << "right lane: " << lane_base_right << endl;
-	bird_eye = lane_detector.DetectLine(bird_eye, 10, true);
-	//cv::imshow("sliding windows", bird_eye);
+	std::vector<std::vector<cv::Point>>* good_lane;
+	lane_detector.DetectLine(bird_eye, good_lane, 10, true);
+	cout << "vector size" << (*good_lane[0]).size() << endl;
 
 	cv::waitKey(0);
 

@@ -198,30 +198,32 @@ int Lane_SemanticSegmentation::HistogramCalc(cv::Mat input_image)
 }
 
 
-void Lane_SemanticSegmentation::FindBaseLanes(cv::Mat input_image, int* lane_left, int* lane_right)
+void Lane_SemanticSegmentation::FindBaseLanes(cv::Mat input_image, int* lane_base)
 {
     int width = input_image.size().width;
     int height = input_image.size().height;
 
     // We only detect lane at 1/4 bottom of the frame to reduce the problem of overly-curve lane
-    int img_search_percentage = 4;
-    cv::Mat left_img = input_image(cv::Range(height * 3/4, height), cv::Range(1, width / 2));
-    cv::Mat right_img = input_image(cv::Range(height * 3/4, height), cv::Range(width / 2, width));
+    cv::Mat half_image[2];    // [0] is left, [1] is right
+    for (int side = 0; side < 2; side++)
+    {
+        // Split the image into 1/2-width & 1/4-bottom to reduce the problem of overly-curve lane
+        half_image[side] = input_image(cv::Range(height * 3 / 4, height), cv::Range(side * width / 2, (side + 1) * width / 2));
 
-    // x_coordinate of lane is estimated as where most non_zero pixel located
-    *lane_left = HistogramCalc(left_img);
-    *lane_right = HistogramCalc(right_img) + width / 2;
+        // x_coordinate of lane is estimated as where most non_zero pixel located
+        lane_base[side] = HistogramCalc(half_image[side]) + side * (width / 2);
+    }
 }
 
 
-cv::Mat Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, int num_windows, bool display)
+void Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, std::vector<std::vector<cv::Point>>* good_lane, int num_windows, bool display)
 {
     // First draftly estimate the coordinate of base_lane by looking at entire image
-    int window_base_left = 1;
-    int window_base_right = 1;
-    FindBaseLanes(input_image, &window_base_left, &window_base_right);
-    cout << "window_base_left x = " << window_base_left << endl;
-    cout << "window_base_right x = " << window_base_right << endl;
+    int window_base[2];     // [0] is left, [1] is right
+    //int window_base_right = 1;
+    FindBaseLanes(input_image, &window_base[0]);
+    cout << "window_base_left x = " << window_base[0] << endl;
+    cout << "window_base_right x = " << window_base[1] << endl;
 
     // Define the size of the sliding windows
     const int window_width = 100;
@@ -231,102 +233,103 @@ cv::Mat Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, int num_windo
     const int num_pixel = 100;
 
     // Create empty vector to receive left & right lane pixel indices
-    std::vector<cv::Point> good_lane_left;
-    std::vector<cv::Point> good_lane_right;
+    //std::vector<cv::Point> good_lane[2];    // [0] is left, [1] is right
 
     // Create empty cv::Mat to crop the sliding_windows later
-    cv::Mat crop_window_left;
-    cv::Mat crop_window_right;
+    cv::Mat crop_window;     // [0] is left, [1] is right
 
     // good_lane is again detected as non_zero within the sliding windows alone
-    for (int window = 0; window < num_windows; window++)
+    for (int side = 0; side < 2; side++)
     {
-        // Locate the 4 corners of each sliding window left & right
-        // "win_..._low" is the top-left corner
-        // "win_..._high" is the bottom-right corner
-        int win_y_low = input_image.size().height - (window + 1) * window_height;
-        int win_y_high = input_image.size().height - window * window_height;
-        int win_xleft_low = window_base_left - window_width / 2;
-        int win_xleft_high = window_base_left + window_width / 2;
-        int win_xright_low = window_base_right - window_width / 2;
-        int win_xright_high = window_base_right + window_width / 2;
-        // Be mindful the inverse x/y coordinate of OpenCV
-
-        //// Display the sliding window in the perspective transform warped image
-        //if (display == true)
-        //{
-        //    cv::rectangle(input_image, upper_left, lower_left, (0, 255, 0), 3);
-        //    cv::rectangle(input_image, upper_right, lower_right, (0, 255, 0), 3);
-        //}
-
-        // Crop the input_image by the sliding windows
-        cv::Mat slide_window_left(input_image, cv::Rect(win_xleft_low, win_y_low, window_width, window_height));
-        cv::Mat slide_window_right(input_image, cv::Rect(win_xleft_low, win_y_low, window_width, window_height));
-        slide_window_left.copyTo(crop_window_left);
-        slide_window_right.copyTo(crop_window_right);
-
-        // All non_zero pixels inside these sliding windows supposed to be good_lane_pixel
-        std::vector<cv::Point> window_lane_pixel_left;
-        std::vector<cv::Point> window_lane_pixel_right;
-        cv::findNonZero(crop_window_left, window_lane_pixel_left);
-        cv::findNonZero(crop_window_right, window_lane_pixel_right);
-        
-        // We need to adjust the (x, y) of lane_pixel by the sliding_window_coordinate
-        int left_lane_mean = 0;
-        int right_lane_mean = 0;    // To readjust the sliding_window coordinate later
-        // For left sliding windows
-        if (window_lane_pixel_left.size() > 0)
+        for (int window = 0; window < num_windows; window++)
         {
-            for (int i = 0; i < window_lane_pixel_left.size(); i++)
+            // Locate the 4 corners of each sliding window left & right
+            // "win_x/y_low" is the top-left corner
+            // "win_x/y_high" is the bottom-right corner
+            if(window == 0)
+                cout << "window_base x2 = " << window_base[side] << endl;
+            int win_y_low = input_image.size().height - (window + 1) * window_height;
+            int win_y_high = input_image.size().height - window * window_height;
+            int win_x_low = window_base[side] - window_width / 2;
+            int win_x_high = window_base[side] + window_width / 2;
+            // Be mindful the inverse x/y coordinate of OpenCV
+
+            // Crop the input_image by the sliding windows
+            cv::Mat slide_window(input_image, cv::Rect(win_x_low, win_y_low, window_width, window_height));
+            slide_window.copyTo(crop_window);
+
+            // All non_zero pixels inside these sliding windows supposed to be good_lane_pixel
+            std::vector<cv::Point> window_lane_pixel;
+            cv::findNonZero(crop_window, window_lane_pixel);
+
+            // We need to adjust the (x, y) of lane_pixel by the sliding_window_coordinate
+            int lane_pixel_mean = 0;
+            // For left sliding windows
+            if (window_lane_pixel.size() > 0)
             {
-                window_lane_pixel_left[i].x += win_xleft_low;
-                window_lane_pixel_left[i].y += win_y_low;
+                for (int i = 0; i < window_lane_pixel.size(); i++)
+                {
+                    window_lane_pixel[i].x += win_x_low;
+                    window_lane_pixel[i].y += win_y_low;
 
-                // Append the window_lane_pixel into the vector of good_lane_pixel
-                good_lane_left.push_back(window_lane_pixel_left[i]);
+                    // Append the window_lane_pixel into the vector of good_lane_pixel
+                    (*good_lane[side])->push_back(window_lane_pixel[i]);
 
-                left_lane_mean += window_lane_pixel_left[i].x;
+                    lane_pixel_mean += window_lane_pixel[i].x;
+                }
+                lane_pixel_mean = lane_pixel_mean / window_lane_pixel.size();
             }
-            left_lane_mean = left_lane_mean / window_lane_pixel_left.size();
-        }
-        
-        // For right sliding_window
-        if (window_lane_pixel_right.size() > 0)
-        {
-            for (int i = 0; i < window_lane_pixel_right.size(); i++)
+
+            // If sufficient non-zero lane_pixel are detected inside each window, recenter the next sliding_window
+            if (window_lane_pixel.size() > num_pixel)
             {
-                window_lane_pixel_right[i].x += win_xright_low;
-                window_lane_pixel_right[i].y += win_y_low;
-
-                // Append the window_lane_pixel into the vector of good_lane_pixel
-                good_lane_right.push_back(window_lane_pixel_right[i]);
-
-                right_lane_mean += window_lane_pixel_right[i].x;
+                window_base[side] = lane_pixel_mean;
             }
-            right_lane_mean = right_lane_mean / window_lane_pixel_right.size();
-        }
-        
-
-        // If sufficient non-zero lane_pixel are detected inside each window, recenter the next sliding_window
-        if (window_lane_pixel_left.size() > num_pixel)
-        {
-            window_base_left = left_lane_mean;
-        }
-        if (window_lane_pixel_right.size() > num_pixel)
-        {
-            window_base_right = right_lane_mean;
         }
     }
 
-    // Fit a 2nd-order polynomial to each lane_pixel
-    cv::Point* pts = (cv::Point*) cv::Mat(good_lane_right).data;
-    int npts = cv::Mat(good_lane_right).rows;
-    cv::polylines(input_image, &pts, &npts, 1, true, cv::Scalar(255, 0, 0));
-    cv::imshow("lane highlight", input_image);
+    // Show only the good_lane pixels. It may be over-displayed due to the cv::polylines method
+    cv::Mat lane_only = cv::Mat::zeros(input_image.size(), input_image.type());
+    cv::polylines(lane_only, good_lane[0], true, cv::Scalar(255));
+    cv::polylines(lane_only, good_lane[1], true, cv::Scalar(255));
+    cv::imshow("lane highlight", lane_only);
     cv::waitKey(0);
 
-    return input_image;
+    //return good_lane;
 }
+
+
+Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals, int order) {
+    assert(xvals.size() == yvals.size());
+    assert(order >= 1 && order <= xvals.size() - 1);
+    Eigen::MatrixXd A(xvals.size(), order + 1);
+    for (int i = 0; i < xvals.size(); i++) {
+        A(i, 0) = 1.0;
+    }
+    for (int j = 0; j < xvals.size(); j++) {
+        for (int i = 0; i < order; i++) {
+            A(j, i + 1) = A(j, i) * xvals(j);
+        }
+    }
+    auto Q = A.householderQr();
+    auto result = Q.solve(yvals);
+    return result;
+}
+// Evaluate a polynomial.
+double polyeval(Eigen::VectorXd coeffs, double x) {
+    double result = 0.0;
+    for (int i = 0; i < coeffs.size(); i++) {
+        result += coeffs[i] * pow(x, i);
+    }
+    return result;
+}
+
+
+cv::Mat Lane_SemanticSegmentation::getAverageLine(cv::Mat input_image, int num_windows, bool display)
+{
+
+}
+
 
 
 int test_img_coordinate()
