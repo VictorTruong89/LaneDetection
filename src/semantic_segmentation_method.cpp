@@ -216,7 +216,7 @@ void Lane_SemanticSegmentation::FindBaseLanes(cv::Mat input_image, int* lane_bas
 }
 
 
-void Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, std::vector<std::vector<cv::Point>>* good_lane, int num_windows, bool display)
+void Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, PixelCoordinate* pixel_coordinate, int num_windows, bool display)
 {
     // First draftly estimate the coordinate of base_lane by looking at entire image
     int window_base[2];     // [0] is left, [1] is right
@@ -231,9 +231,6 @@ void Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, std::vector<std:
     
     // Minimum number of lane_pixel, above which to relocate the sliding_window
     const int num_pixel = 100;
-
-    // Create empty vector to receive left & right lane pixel indices
-    //std::vector<cv::Point> good_lane[2];    // [0] is left, [1] is right
 
     // Create empty cv::Mat to crop the sliding_windows later
     cv::Mat crop_window;     // [0] is left, [1] is right
@@ -273,7 +270,10 @@ void Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, std::vector<std:
                     window_lane_pixel[i].y += win_y_low;
 
                     // Append the window_lane_pixel into the vector of good_lane_pixel
-                    (*good_lane[side])->push_back(window_lane_pixel[i]);
+                    if (side == 0)
+                        pixel_coordinate->lane_pixel_left.push_back(window_lane_pixel[i]);
+                    else
+                        pixel_coordinate->lane_pixel_right.push_back(window_lane_pixel[i]);
 
                     lane_pixel_mean += window_lane_pixel[i].x;
                 }
@@ -287,19 +287,28 @@ void Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, std::vector<std:
             }
         }
     }
-
-    // Show only the good_lane pixels. It may be over-displayed due to the cv::polylines method
-    cv::Mat lane_only = cv::Mat::zeros(input_image.size(), input_image.type());
-    cv::polylines(lane_only, good_lane[0], true, cv::Scalar(255));
-    cv::polylines(lane_only, good_lane[1], true, cv::Scalar(255));
-    cv::imshow("lane highlight", lane_only);
-    cv::waitKey(0);
-
-    //return good_lane;
 }
 
 
-Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals, int order) {
+void PolynomialDisplay(cv::Mat input_image, std::vector<cv::Point>polyline)
+{
+    cv::Mat canvas = cv::Mat::zeros(input_image.size(), input_image.type());
+    cv::polylines(canvas, polyline, true, cv::Scalar(255));
+    cv::imshow("polyline", canvas);
+    cv::waitKey(0);
+}
+
+
+// CALCULATE POLINOMIAL COOEFICIENT OF LANE PIXELS
+/**
+ *@brief Find the cooeficients of the polyline that fit all lane_pixel
+ *@param[in] xvals the x_coordinate of lane_pixels
+ *@param[in] yvals the y_coordinate of lane_pixels
+ *@param[in] order the order of the polinomial function
+ *@return Eigen::VectorXd of the cooficients of the polinomial function
+ */
+Eigen::VectorXd PolynomialFit(Eigen::VectorXd xvals, Eigen::VectorXd yvals, int order) 
+{
     assert(xvals.size() == yvals.size());
     assert(order >= 1 && order <= xvals.size() - 1);
     Eigen::MatrixXd A(xvals.size(), order + 1);
@@ -315,8 +324,18 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals, int order)
     auto result = Q.solve(yvals);
     return result;
 }
-// Evaluate a polynomial.
-double polyeval(Eigen::VectorXd coeffs, double x) {
+
+
+// PREDICT THE Y_VALS BASE ON THE POLINOMIAL COOEFICIENT
+/**
+ *@brief Find the cooeficients of the polyline that fit all lane_pixel
+ *@param[in] coeffs vector of coeficients of the polinomial function
+ *@param[in] x array 
+ *@param[in] order the order of the polinomial function
+ *@return Eigen::VectorXd of the cooficients of the polinomial function
+ */
+double PolynomialEval(Eigen::VectorXd coeffs, double x) 
+{
     double result = 0.0;
     for (int i = 0; i < coeffs.size(); i++) {
         result += coeffs[i] * pow(x, i);

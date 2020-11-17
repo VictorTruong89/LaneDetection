@@ -39,7 +39,7 @@ public:
 
 	void FindBaseLanes(cv::Mat input_image, int* lane_base);
 
-	void Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, std::vector<std::vector<cv::Point>>* good_lane, int num_windows, bool display);
+	void Lane_SemanticSegmentation::DetectLine(cv::Mat input_image, PixelCoordinate* pixel_coordinate, int num_windows, bool display);
 
 	void Lane_SemanticSegmentation::polyfit(const std::vector<double>& xv, const std::vector<double>& yv, std::vector<double>& coeff, int order);
 
@@ -51,5 +51,34 @@ public:
 
 };
 
+
+struct PixelCoordinate
+{
+	// For using OpenCV library
+	std::vector<cv::Point> lane_pixel_left;
+	std::vector<cv::Point> lane_pixel_right;
+
+	// For using Eigen library
+	Eigen::VectorXd left_coordinate_x;
+	Eigen::VectorXd left_coordinate_y;
+	Eigen::VectorXd right_coordinate_x;
+	Eigen::VectorXd right_coordinate_y;
+
+	// Parse pixel_coord from OpenCV to Eigen
+	void OpenCV_2_Eigen()
+	{
+		for (int i = 0; i < lane_pixel_left.size(); i++)
+		{
+			left_coordinate_x[i] = lane_pixel_left[i].x;
+			left_coordinate_y[i] = lane_pixel_left[i].y;
+		}
+		for (int i = 0; i < lane_pixel_right.size(); i++)
+		{
+			right_coordinate_x[i] = lane_pixel_right[i].x;
+			right_coordinate_y[i] = lane_pixel_right[i].y;
+		}
+	}
+
+};
 
 #endif  // SEMANTIC_SEGMENTATION_METHOD_HPP_
